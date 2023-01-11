@@ -10,56 +10,55 @@
 
 // TODO: Run grep through this function
 // TODO: access file system directory
+// TODO: task queue
 // DONE: Pass path and search_string as parameters in threads
 struct thread_arguments{
     int worker_ID;
-    char * path;
     char * search_string;
 };
 
-void * parallel_grep(void* args){
+char buffer[250];
+
+int ENQUEUER(int ID, char * current_dir){
+    printf("[%d] ENQUEUE READY\n",some_arguments->worker_ID);
+}
+
+int DEQUEUER(int ID, char * search){
+    printf("[%d] DEQUEUE READY\n",some_arguments->worker_ID);
+}
+
+void * WORKER(void* args){
 
     struct thread_arguments * some_arguments = (struct thread_arguments *)args;
-    printf("thread works!; workerID: %d; path: %s; search_string: %s\n", some_arguments->worker_ID, some_arguments->path,some_arguments->search_string);
+    printf("thread works!; workerID: %d; search_string: %s\n", some_arguments->worker_ID, some_arguments->search_string);
 
-    // TODO: check if path is absolute or relative
-    printf("path[0]: %c\n", some_arguments->path[0]);
-    if (some_arguments->path[0]!='/'){ //root path is NOT absolute!
-        continue;
-    }
-    else{ //root path is absolute!
-        continue;
-    }
+    printf("[%d] WORKER ON DUTY\n", some_arguments->worker_ID);
+    DEQUEUER(some_arguments->worker_ID, some_arguments->search_string);
+    ENQUEUER(some_arguments->worker_ID, taskqueue)
+    printf("[%d] ENQUEUE READY\n",some_arguments->worker_ID);
     // system();
 }
 
 int main(int argc, char *argv[]){ // {command} {workers N} {rootpath} {search string}
     if (argc != 4) return -1; //it should return something since argc should be 4
     int workers = atoi(argv[1]); // convert argv[1] into an integer 
+    // INITIALIZE SEMAPHORES OR COND_VARS OR LOCKS
     pthread_t threads[workers];
     struct thread_arguments * const some_arg = malloc(workers*sizeof(struct thread_arguments));
     for(int i = 0; i<workers; i++){
         some_arg[i].worker_ID = i;
-        some_arg[i].path = argv[2];
         some_arg[i].search_string = argv[3];
     }
     
+    // TODO: ENQUEUE rootpath here!
     printf("argc output is: %d\n", argc);
 
-    // Sanity Test: testing/checking the arguments passed in the multithreaded grep
-    // argv[1]: Number of workers N
-    // argv[2]: Root of directory tree to search (hereby referred to as rootpath)
-    // argv[3]: Search string to be used by grep
-    // printf("workers: %d\n", workers);
-    // printf("path: %s\n", some_arg->path);
-    // printf("search_string: %s\n", some_arg->search_string);
-
-    // printf("working directory: %s\n", getcwd(buffer, sizeof(buffer)));
+    printf("cwd: %s\n", getcwd(buffer, sizeof(buffer)));
 
     // check if rootpath is absolute 
     // DONE: create number of threads based on variable workers
     for(int i = 0; i < workers; i++){
-        pthread_create(&threads[i], NULL, parallel_grep, &some_arg[i]);
+        pthread_create(&threads[i], NULL, WORKER, &some_arg[i]);
     }
 
     for(int i = 0; i < workers; i++){
