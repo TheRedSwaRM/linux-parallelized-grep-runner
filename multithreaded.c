@@ -17,25 +17,65 @@ struct thread_arguments{
     char * search_string;
 };
 
-char buffer[250];
+typedef struct __node_t {
+    int value;
+    struct __node_t *next;
+} t_node;
 
-int ENQUEUER(int ID, char * current_dir){
-    printf("[%d] ENQUEUE READY\n",some_arguments->worker_ID);
+typedef struct t_queue{
+    struct node * head;
+    struct node * tail;
+    pthread_mutex_t head_lock, tail_lock;
+} t_queue;
+
+void Task_Queue_Init(){
+
 }
 
-int DEQUEUER(int ID, char * search){
-    printf("[%d] DEQUEUE READY\n",some_arguments->worker_ID);
+t_queue *task_queue = NULL;
+char buffer[250];
+
+int ENQUEUER(int ID){
+    printf("[%d] ENQUEUE READY\n", ID);
+    // t_node *tmp = malloc(sizeof(t_node));
+    // assert(tmp != NULL);
+    // tmp->value = value;
+    // tmp->next = NULL;
+
+    // pthread_mutex_lock(&q->tail_lock);
+    // task_queue->tail->next = tmp;
+    // task_queue->tail = tmp;
+    // pthread_mutex_unlock(&q->tail_lock);
+}
+
+char * DEQUEUER(int ID){
+    printf("[%d] DEQUEUE READY\n", ID);
+    // pthread_mutex_lock(&q->head_lock);
+    // t_node *tmp = q->head;
+    // t_node *new_head = tmp->next;
+    // if (new_head == NULL) {
+    //     pthread_mutex_unlock(&q->head_lock);
+    //     return -1; // queue was empty
+    // }
+    // *value = new_head->value;
+    // q->head = new_head;
+    // pthread_mutex_unlock(&q->head_lock);
+    // free(tmp);
+    // return 0;
 }
 
 void * WORKER(void* args){
 
     struct thread_arguments * some_arguments = (struct thread_arguments *)args;
-    printf("thread works!; workerID: %d; search_string: %s\n", some_arguments->worker_ID, some_arguments->search_string);
+    // printf("thread works!; workerID: %d; search_string: %s\n", some_arguments->worker_ID, some_arguments->search_string);
 
+    // Worker's Job:
+    // run dequeue, return path, if path is directory, run enqueue, if path is file, run grep
+    // TODO: FIGURE OUT STOPPING CONDITION
     printf("[%d] WORKER ON DUTY\n", some_arguments->worker_ID);
-    DEQUEUER(some_arguments->worker_ID, some_arguments->search_string);
-    ENQUEUER(some_arguments->worker_ID, taskqueue)
-    printf("[%d] ENQUEUE READY\n",some_arguments->worker_ID);
+    DEQUEUER(some_arguments->worker_ID);
+    
+    ENQUEUER(some_arguments->worker_ID);
     // system();
 }
 
