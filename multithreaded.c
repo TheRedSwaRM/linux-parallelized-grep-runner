@@ -68,29 +68,29 @@ int ENQUEUER(int ID, char * some_path){
         task_queue->tail->next = tmp;
         task_queue->tail = tmp;
     }
-    printf("[%d] nakapag-enqueue na dito!\n", ID);
-    printf("[%d] cond_signal success\n", ID);
+    // printf("[%d] nakapag-enqueue na dito!\n", ID);
+    // printf("[%d] cond_signal success\n", ID);
     pthread_mutex_unlock(&task_queue->tail_lock);
-    pthread_cond_signal(&cond);
-    printf("[%d] tail unlock success\n", ID);
+    // pthread_cond_signal(&cond);
+    // printf("[%d] tail unlock success\n", ID);
     return 0;
 }
 
 char * DEQUEUER(int ID){
     // printf("[%d] DEQUEUE READY\n", ID);
-    
+    redequeue:
     pthread_mutex_lock(&task_queue->head_lock);
     // printf("[%d] lock success\n", ID);
     if(task_queue->head==NULL){
         // printf("[%d] NULL\n", ID);
-        WORKER_WAIT_COUNTER++;
-        pthread_cond_wait(&cond, &task_queue->head_lock);
-        WORKER_WAIT_COUNTER--;
+        
+        pthread_mutex_unlock(&task_queue->head_lock);
+        return NULL;
     }
     // printf("[%d] wait success\n", ID);
     t_node *tmp = task_queue->head;
     // printf("[%d] umabot dito\n", ID);
-    printf("[%d] task_queue->head from DEQUEUE: %p\n", ID, tmp);
+    // printf("[%d] task_queue->head from DEQUEUE: %p\n", ID, tmp);
     char * some_path = malloc(sizeof(char *)*(strlen(tmp->path)+1));
     // printf("[%d] some_path from DEQUEUE: %p\n", ID, &some_path);
     // printf("[%d] did segfault here?\n", ID);
@@ -103,11 +103,11 @@ char * DEQUEUER(int ID){
     else{ //absolute path
         printf("[%d] DIR %s\n", ID, some_path);
     }
-    printf("[%d] or maybe here?\n", ID);
+    // printf("[%d] or maybe here?\n", ID);
     task_queue->head = new_head;
-    printf("[%d] queue adjustment success\n", ID);
+    // printf("[%d] queue adjustment success\n", ID);
     pthread_mutex_unlock(&task_queue->head_lock);
-    printf("[%d] head unlock success\n", ID);
+    // printf("[%d] head unlock success\n", ID);
     free(tmp->path);
     free(tmp);
     return some_path;
@@ -127,8 +127,9 @@ void * WORKER(void* args){
         char * path = DEQUEUER(some_arguments->worker_ID);
         // printf("[%d] Path accessed by worker: %s\n", some_arguments->worker_ID, path);
         // DO TASKS HERE
+        if (path == NULL){continue;}
         DIR * current_working_dir = opendir(path);
-        printf("[%d] Path accessed by worker: %s\n", some_arguments->worker_ID, path);
+        // printf("[%d] Path accessed by worker: %s\n", some_arguments->worker_ID, path);
 
 
         while(1){
@@ -200,7 +201,7 @@ void * WORKER(void* args){
             found_reg:
             // printf("[%d] nakaabot dito!\n", some_arguments->worker_ID);
         }   
-        printf("WORKER WAIT COUNTER: %d\n", WORKER_WAIT_COUNTER);
+        // printf("WORKER WAIT COUNTER: %d\n", WORKER_WAIT_COUNTER);
         closedir(current_working_dir);
     }
     
