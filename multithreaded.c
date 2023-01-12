@@ -29,11 +29,16 @@ typedef struct t_queue{
     pthread_mutex_t head_lock, tail_lock;
 } t_queue;
 
+
+pthread_t *threads;
 t_queue *task_queue = NULL;
 char buffer[250];
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 int WORKER_WAIT_COUNTER = 0;
-int no_more_jobs = 0;
+int *worker_waiting;
+int waiting_queue_count = 0;
+int currently_waiting_count = 0;
+int done = 0;
 
 void Task_Queue_Init(t_queue *q){
     t_node *tmp = malloc(sizeof(t_node));
@@ -71,22 +76,50 @@ int ENQUEUER(int ID, char * some_path){
     // printf("[%d] nakapag-enqueue na dito!\n", ID);
     // printf("[%d] cond_signal success\n", ID);
     pthread_mutex_unlock(&task_queue->tail_lock);
-    // pthread_cond_signal(&cond);
+    pthread_cond_signal(&cond);
     // printf("[%d] tail unlock success\n", ID);
     return 0;
 }
 
 char * DEQUEUER(int ID){
     // printf("[%d] DEQUEUE READY\n", ID);
-    redequeue:
     pthread_mutex_lock(&task_queue->head_lock);
     // printf("[%d] lock success\n", ID);
-    if(task_queue->head==NULL){
+    while(task_queue->head==NULL){
+        if (done == 1){
+            printf("yeah done na talaga\n");
+            return NULL;
+        }
         // printf("[%d] NULL\n", ID);
-        
-        pthread_mutex_unlock(&task_queue->head_lock);
-        return NULL;
+        currently_waiting_count = 0;
+        worker_waiting[ID] = 1;
+        for(int i=0;i<waiting_queue_count;i++){
+            currently_waiting_count = currently_waiting_count + worker_waiting[i];
+            if(i == waiting_queue_count-1){
+                printf("%d\n", worker_waiting[i]);
+                break;
+            }
+
+            printf("%d ", worker_waiting[i]);
+        }
+        printf("currently waiting count: %d\n", currently_waiting_count);
+        printf("waiting queue count: %d\n",waiting_queue_count);
+        if (currently_waiting_count == waiting_queue_count) {
+            printf("done\n");
+            done = 1;
+            waiting_queue_count--;
+            currently_waiting_count--;
+            printf("oks\n");
+            pthread_cond_broadcast(&cond);
+            
+            printf("oks na oks with done = %d\n", done);
+            printf("task_queue->head: %p\n",task_queue->head);
+            return NULL;
+        }
+        pthread_cond_wait(&cond, &task_queue->head_lock);
     }
+    currently_waiting_count = 0;
+    worker_waiting[ID] = 0;
     // printf("[%d] wait success\n", ID);
     t_node *tmp = task_queue->head;
     // printf("[%d] umabot dito\n", ID);
@@ -127,8 +160,10 @@ void * WORKER(void* args){
         char * path = DEQUEUER(some_arguments->worker_ID);
         // printf("[%d] Path accessed by worker: %s\n", some_arguments->worker_ID, path);
         // DO TASKS HERE
-        if (path == NULL){continue;}
+        if(done == 1) break;
+        if(path==NULL) continue;
         DIR * current_working_dir = opendir(path);
+        
         // printf("[%d] Path accessed by worker: %s\n", some_arguments->worker_ID, path);
 
 
@@ -216,7 +251,12 @@ int main(int argc, char *argv[]){ // {command} {workers N} {rootpath} {search st
     task_queue = malloc(sizeof(t_queue));
     Task_Queue_Init(task_queue);
 
-    pthread_t threads[workers];
+    threads = malloc(workers*sizeof(pthread_t*));
+    waiting_queue_count = workers;
+    worker_waiting = malloc(workers*sizeof(int));
+    for(int i=0;i<waiting_queue_count;i++){
+        worker_waiting[i] = 0;
+    }
     struct thread_arguments * const some_arg = malloc(workers*sizeof(struct thread_arguments));
     for(int i = 0; i<workers; i++){
         some_arg[i].worker_ID = i;
@@ -228,7 +268,6 @@ int main(int argc, char *argv[]){ // {command} {workers N} {rootpath} {search st
     strcpy(temp_path, argv[2]);
     task_queue->head->path = temp_path;
     // ---
-
 
     printf("cwd: %s\n", getcwd(buffer, sizeof(buffer)));
 
