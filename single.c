@@ -48,7 +48,6 @@ int ENQUEUER(int ID, char * current_dir){
         printf("[%d] ENQUEUE %s\n", ID, current_dir);
     }
 
-    int enQd = 0;
     t_node *tmp = malloc(sizeof(t_node));
     tmp->path = current_dir;
     tmp->next = NULL;
