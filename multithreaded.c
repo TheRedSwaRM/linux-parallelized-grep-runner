@@ -9,8 +9,8 @@
 #include <sys/types.h>
 #include <assert.h>
 
-// TODO: Run grep
-// TODO: access file system directory
+// DONE: Run grep
+// DONE: access file system directory
 // DONE: task queue
 // DONE: Pass path and search_string as parameters in threads
 struct thread_arguments{
@@ -34,11 +34,11 @@ pthread_t *threads;
 t_queue *task_queue = NULL;
 char buffer[250];
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-int WORKER_WAIT_COUNTER = 0;
 int *worker_waiting;
 int waiting_queue_count = 0;
 int currently_waiting_count = 0;
 int done = 0;
+pthread_mutex_t stop_lock;
 
 void Task_Queue_Init(t_queue *q){
     t_node *tmp = malloc(sizeof(t_node));
@@ -57,8 +57,8 @@ int ENQUEUER(int ID, char * some_path){
     else{ //absolute path
         printf("[%d] ENQUEUE %s\n", ID, some_path);
     }
-    pthread_mutex_lock(&task_queue->tail_lock);
-    t_node *tmp = malloc(sizeof(t_node));
+    pthread_mutex_lock(&task_queue->head_lock);
+    t_node *tmp = malloc(sizeof(t_node)); // May free() na ito
     
     assert(tmp!=NULL);
     tmp->path = some_path;
@@ -75,56 +75,47 @@ int ENQUEUER(int ID, char * some_path){
     }
     // printf("[%d] nakapag-enqueue na dito!\n", ID);
     // printf("[%d] cond_signal success\n", ID);
-    pthread_mutex_unlock(&task_queue->tail_lock);
-    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&task_queue->head_lock);
     // printf("[%d] tail unlock success\n", ID);
     return 0;
 }
 
 char * DEQUEUER(int ID){
     // printf("[%d] DEQUEUE READY\n", ID);
-    pthread_mutex_lock(&task_queue->head_lock);
     // printf("[%d] lock success\n", ID);
+    
+    pthread_mutex_lock(&task_queue->head_lock);
     while(task_queue->head==NULL){
+        currently_waiting_count = 0;
         if (done == 1){
-            printf("yeah done na talaga\n");
+            pthread_mutex_unlock(&task_queue->head_lock);
             return NULL;
         }
-        // printf("[%d] NULL\n", ID);
-        currently_waiting_count = 0;
+        // // // printf("[%d] NULL\n", ID);
+        // // currently_waiting_count = 0;
         worker_waiting[ID] = 1;
         for(int i=0;i<waiting_queue_count;i++){
             currently_waiting_count = currently_waiting_count + worker_waiting[i];
-            if(i == waiting_queue_count-1){
-                printf("%d\n", worker_waiting[i]);
-                break;
-            }
-
-            printf("%d ", worker_waiting[i]);
+        //     // printf("%d ", worker_waiting[i]);
         }
-        printf("currently waiting count: %d\n", currently_waiting_count);
-        printf("waiting queue count: %d\n",waiting_queue_count);
+        // printf("currently waiting count: %d\n", currently_waiting_count);
+        // printf("waiting queue count: %d\n",waiting_queue_count);
         if (currently_waiting_count == waiting_queue_count) {
-            printf("done\n");
             done = 1;
-            waiting_queue_count--;
-            currently_waiting_count--;
-            printf("oks\n");
-            pthread_cond_broadcast(&cond);
-            
-            printf("oks na oks with done = %d\n", done);
-            printf("task_queue->head: %p\n",task_queue->head);
+            pthread_mutex_unlock(&task_queue->head_lock);
             return NULL;
         }
-        pthread_cond_wait(&cond, &task_queue->head_lock);
+        pthread_mutex_unlock(&task_queue->head_lock);
+        return NULL;
     }
+    
     currently_waiting_count = 0;
     worker_waiting[ID] = 0;
     // printf("[%d] wait success\n", ID);
     t_node *tmp = task_queue->head;
     // printf("[%d] umabot dito\n", ID);
     // printf("[%d] task_queue->head from DEQUEUE: %p\n", ID, tmp);
-    char * some_path = malloc(sizeof(char *)*(strlen(tmp->path)+1));
+    char * some_path = malloc(sizeof(char *)*(strlen(tmp->path)+1)); // May free() na ito
     // printf("[%d] some_path from DEQUEUE: %p\n", ID, &some_path);
     // printf("[%d] did segfault here?\n", ID);
     t_node *new_head = tmp->next;
@@ -157,10 +148,15 @@ void * WORKER(void* args){
     // that would mean that there are no more ENQUEUEs needed to be done, and hence, 
     
     while(1){
+        pthread_mutex_lock(&task_queue->head_lock);
+        if(done == 1) {
+            pthread_mutex_unlock(&task_queue->head_lock);
+            break;
+        }
+        pthread_mutex_unlock(&task_queue->head_lock);
         char * path = DEQUEUER(some_arguments->worker_ID);
         // printf("[%d] Path accessed by worker: %s\n", some_arguments->worker_ID, path);
         // DO TASKS HERE
-        if(done == 1) break;
         if(path==NULL) continue;
         DIR * current_working_dir = opendir(path);
         
@@ -182,7 +178,7 @@ void * WORKER(void* args){
                 case DT_REG: {
                     // printf("FOUND FILE!\n");
                     // grep
-                    char * grep_command = malloc(sizeof(char*)*(strlen("grep ")+strlen(path)+2+strlen(some_arguments->search_string)+3+strlen(entry->d_name)+2));
+                    char * grep_command = malloc(sizeof(char*)*(strlen("grep ")+strlen(path)+2+strlen(some_arguments->search_string)+3+strlen(entry->d_name)+2)); // May free() na ito
                     strcpy(grep_command, "grep '");
                     strcat(grep_command, some_arguments->search_string);
                     strcat(grep_command, "' '");
@@ -193,7 +189,7 @@ void * WORKER(void* args){
                     strcat(grep_command, "> /dev/null");
 
                     // printf("grep_command: %s\n", grep_command);
-                    int return_value = system(grep_command); //TODO: REDIRECT STANDARD OUTPUT AND STANDARD ERROR
+                    int return_value = system(grep_command); 
                     // printf("return value of grep: %d\n", return_value);
                     if (return_value!=0){ // NOT FOUND // DONE: CHECK IF PATH IS ABSOLUTE OR RELATIVE
                         if(path[0]!=47){// if relative path, print absolute version
@@ -237,6 +233,7 @@ void * WORKER(void* args){
             // printf("[%d] nakaabot dito!\n", some_arguments->worker_ID);
         }   
         // printf("WORKER WAIT COUNTER: %d\n", WORKER_WAIT_COUNTER);
+        free(path);
         closedir(current_working_dir);
     }
     
@@ -248,28 +245,29 @@ int main(int argc, char *argv[]){ // {command} {workers N} {rootpath} {search st
     int workers = atoi(argv[1]); // convert argv[1] into an integer 
     // DONE: INITIALIZE SEMAPHORES OR COND_VARS OR LOCKS
 
-    task_queue = malloc(sizeof(t_queue));
+    task_queue = malloc(sizeof(t_queue)); // May free() na ito
     Task_Queue_Init(task_queue);
+    pthread_mutex_init(&stop_lock, NULL);
 
-    threads = malloc(workers*sizeof(pthread_t*));
+    threads = malloc(workers*sizeof(pthread_t*)); // May free() na ito
     waiting_queue_count = workers;
-    worker_waiting = malloc(workers*sizeof(int));
+    worker_waiting = malloc(workers*sizeof(int)); // May free() na ito
     for(int i=0;i<waiting_queue_count;i++){
         worker_waiting[i] = 0;
     }
-    struct thread_arguments * const some_arg = malloc(workers*sizeof(struct thread_arguments));
+    struct thread_arguments * const some_arg = malloc(workers*sizeof(struct thread_arguments));// May free() na ito
     for(int i = 0; i<workers; i++){
         some_arg[i].worker_ID = i;
         some_arg[i].search_string = argv[3];
     }
     
     // --- Section: ENQUEUE initial rootpath here!
-    char * temp_path = malloc(sizeof(char*)*(strlen(argv[2])+1));
+    char * temp_path = malloc(sizeof(char*)*(strlen(argv[2])+1)); // May free() na ito
     strcpy(temp_path, argv[2]);
     task_queue->head->path = temp_path;
     // ---
 
-    printf("cwd: %s\n", getcwd(buffer, sizeof(buffer)));
+    getcwd(buffer, sizeof(buffer));
 
     // --- Section: create number of threads based on variable workers
     for(int i = 0; i < workers; i++){
@@ -280,6 +278,8 @@ int main(int argc, char *argv[]){ // {command} {workers N} {rootpath} {search st
         pthread_join(threads[i], NULL);
     }
     // ---
+    free(threads);
+    free(worker_waiting);
     free(task_queue);
     free(some_arg);
     return 0;
