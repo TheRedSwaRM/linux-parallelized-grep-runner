@@ -37,7 +37,6 @@ int *worker_waiting;
 int waiting_queue_count = 0;
 int currently_waiting_count = 0;
 int done = 0;
-pthread_mutex_t stop_lock;
 
 void Task_Queue_Init(t_queue *q){
     t_node *tmp = malloc(sizeof(t_node));
@@ -246,7 +245,6 @@ int main(int argc, char *argv[]){ // {command} {workers N} {rootpath} {search st
 
     task_queue = malloc(sizeof(t_queue)); // May free() na ito
     Task_Queue_Init(task_queue);
-    pthread_mutex_init(&stop_lock, NULL);
 
     threads = malloc(workers*sizeof(pthread_t*)); // May free() na ito
     waiting_queue_count = workers;
