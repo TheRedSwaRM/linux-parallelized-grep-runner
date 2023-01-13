@@ -4,7 +4,6 @@
 #include <string.h>
 #include <dirent.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <assert.h>
